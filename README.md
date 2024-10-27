@@ -1,4 +1,4 @@
-# UF-IBM-AI-Days-Hackathon
+# Disaster Buster - Smart RAG Model that 
 Simple overview of use/purpose.
 
 ## Description
