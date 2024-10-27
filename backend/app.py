@@ -4,6 +4,8 @@ import base64
 import os
 from dotenv import load_dotenv
 import requests
+from bs4 import BeautifulSoup
+from geopy.geocoders import Nominatim
 
 app = Flask(__name__)
 CORS(app)
@@ -11,6 +13,61 @@ load_dotenv()
 
 IBM_API_KEY = os.getenv("IBM_API_KEY")
 PROJECT_ID = os.getenv("PROJECT_ID")
+
+# Initialize geolocator
+geolocator = Nominatim(user_agent="geoapiExercises")
+
+@app.route('/get-disaster-info', methods=['POST'])
+def get_disaster_info():
+    data = request.json
+    user_input = data.get("message", "")
+    lat = data.get("lat")
+    lon = data.get("lon")
+
+    # Extract location and disaster keywords from the user input
+    keywords = user_input.split()  # Simplified; for complex extraction, use NLP
+    location_keyword = None
+    disaster_keyword = None
+
+    for word in keywords:
+        if word.lower() in ["hurricane", "flood", "earthquake", "wildfire"]:  # Example disaster types
+            disaster_keyword = word.lower()
+        elif not lat and not lon:  # Assume location if coordinates not provided
+            location_keyword = word
+
+    # Use geolocation API to get coordinates if location name is provided
+    if location_keyword and not (lat and lon):
+        location = geolocator.geocode(location_keyword)
+        if location:
+            lat, lon = location.latitude, location.longitude
+
+    if not lat or not lon:
+        return jsonify({"error": "Location data is required"}), 400
+
+    # Build a search query using the location and disaster type
+    search_query = f"{location_keyword} {disaster_keyword} news"
+    google_search_url = f"https://www.google.com/search?q={search_query.replace(' ', '+')}"
+
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
+    }
+    
+    response = requests.get(google_search_url, headers=headers)
+    soup = BeautifulSoup(response.text, "html.parser")
+    
+    # Extract top headlines from Google search results
+    results = []
+    for item in soup.find_all('h3'):
+        if item.text:
+            results.append(item.text)
+        if len(results) >= 5:  # Limit to top 5 results
+            break
+
+    if results:
+        return jsonify({"success": True, "data": results}), 200
+    else:
+        return jsonify({"success": False, "message": "No data found"}), 404
+
 
 def get_auth_token(api_key):
     auth_url = "https://iam.cloud.ibm.com/identity/token"

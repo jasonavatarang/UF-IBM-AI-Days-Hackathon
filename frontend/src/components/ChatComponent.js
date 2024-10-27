@@ -1,23 +1,40 @@
-import React, { useState } from "react";
-import { uploadImage, sendMessage } from "../api/api";
-import "./ChatComponent.css";  // Import the CSS file for styling
+import React, { useState, useEffect } from "react";
+import { uploadImage, sendMessage, fetchDisasterInfo } from "../api/api";
+import "./ChatComponent.css";
 
 function ChatComponent() {
     const [messages, setMessages] = useState([]);
     const [input, setInput] = useState("");
-    const [file, setFile] = useState(null);
+    const [location, setLocation] = useState({ lat: null, lon: null });
 
-    const handleImageUpload = async () => {
-        if (!file) return;
-        const response = await uploadImage(file);
-        setMessages([...messages, { role: "user", content: response.image_base64 }]);
-    };
+    useEffect(() => {
+        // Capture user location when the component mounts
+        if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition((position) => {
+                setLocation({
+                    lat: position.coords.latitude,
+                    lon: position.coords.longitude,
+                });
+            });
+        }
+    }, []);
 
     const handleSendMessage = async () => {
         if (!input) return;
-        const response = await sendMessage(input);
+        
+        const response = await sendMessage(input, location);
         setMessages([...messages, { role: "user", content: input }, { role: "assistant", content: response.reply }]);
         setInput("");
+    };
+
+    const handleFetchDisasterInfo = async () => {
+        const response = await fetchDisasterInfo({ message: input, ...location });
+
+        if (response.success) {
+            setMessages([...messages, { role: "assistant", content: response.data.join("\n") }]);
+        } else {
+            setMessages([...messages, { role: "assistant", content: response.message }]);
+        }
     };
 
     return (
@@ -29,27 +46,21 @@ function ChatComponent() {
             <div className="chat-box">
                 {messages.map((msg, idx) => (
                     <div key={idx} className={msg.role === "user" ? "message user-message" : "message assistant-message"}>
-                        {msg.role === "user" && file ? (
-                            <img src={`data:image/png;base64,${msg.content}`} alt="uploaded" className="uploaded-image" />
-                        ) : (
-                            <p>{msg.content}</p>
-                        )}
+                        <p>{msg.content}</p>
                     </div>
                 ))}
             </div>
 
             <div className="chat-input-section">
-                <input type="file" onChange={(e) => setFile(e.target.files[0])} className="upload-input" />
-                <button onClick={handleImageUpload} className="upload-button">Upload Image</button>
-
                 <input
                     type="text"
                     value={input}
                     onChange={(e) => setInput(e.target.value)}
-                    placeholder="Type your message here..."
+                    placeholder="Type your message here (e.g., Milton hurricane)..."
                     className="chat-input"
                 />
                 <button onClick={handleSendMessage} className="send-button">Send</button>
+                <button onClick={handleFetchDisasterInfo} className="send-button">Get Disaster Info</button>
             </div>
         </div>
     );

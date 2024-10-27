@@ -1,5 +1,16 @@
 const BASE_URL = "http://localhost:5000";
 
+export const fetchDisasterInfo = async (location) => {
+    const response = await fetch(`${BASE_URL}/get-disaster-info`, {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+        },
+        body: JSON.stringify(location),
+    });
+    return response.json();
+};
+
 export const uploadImage = async (file) => {
     const formData = new FormData();
     formData.append("file", file);
